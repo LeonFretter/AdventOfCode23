@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 
 
-@dataclass
+@dataclass(frozen=True)
 class Char:
     x: int
     y: int
@@ -49,6 +49,15 @@ class Map:
                 neighbors.append(self.getChar(xi, yi))
         return neighbors
 
+    def getWordNeighbors(self, word: Word) -> list[Char]:
+        neighbors: list[Char] = []
+        for c in word.chars:
+            neighbors.extend(self.getNeighbors(c))
+        return list(set(neighbors))
+
+    def filterChars(self, chars: list[Char], sym: str) -> list[Char]:
+        return [c for c in chars if c.char == sym]
+
     def getNumbers(self) -> list[Word]:
         numbers: list[Word] = []
         for y in range(self.height):
@@ -65,17 +74,52 @@ class Map:
         return numbers
 
     def isAdjacentToSymbol(self, word: Word) -> bool:
-        for c in word.chars:
-            neighbors = self.getNeighbors(c)
-            for n in neighbors:
-                c = n.char
-                if not c.isdigit() and not c.isalpha() and c != '.':
-                    return True
+        wordNeighbors = self.getWordNeighbors(word)
+        for n in wordNeighbors:
+            c = n.char
+            if not c.isdigit() and not c.isalpha() and c != '.':
+                return True
         return False
 
     def getNumbersAdjacentToSymbol(self) -> list[Word]:
         numbers = self.getNumbers()
         return [n for n in numbers if self.isAdjacentToSymbol(n)]
+
+    def getNumbersAdjacentToSymbolWithNeighbors(self) -> list[tuple[Word, list[Char]]]:
+        nums = [w for w in self.getNumbers() if self.isAdjacentToSymbol(w)]
+        return [(w, self.getWordNeighbors(w)) for w in nums]
+
+    def getNumbersAdjacentToSymbolWithStarNeighbors(self) -> list[tuple[Word, list[Char]]]:
+        nums = self.getNumbersAdjacentToSymbolWithNeighbors()
+        return [(w, self.filterChars(n, '*')) for w, n in nums]
+
+    def getStarTouching(self) -> list[tuple[list[Word], Char]]:
+        nums = [x for x in self.getNumbersAdjacentToSymbolWithStarNeighbors() if len(x[1]) > 0]
+        stars: list[Char] = []
+        for _, s in nums:
+            stars.extend(s)
+        stars = list(set(stars))
+
+        touching: list[tuple[list[Word], Char]] = []
+        for s in stars:
+            current_words: list[Word] = []
+            for n, neighbors in nums:
+                if s in neighbors:
+                    current_words.append(n)
+            touching.append((current_words, s))
+
+        return touching
+
+    def getGears(self) -> list[tuple[Word, Word]]:
+        touching = self.getStarTouching()
+        gears = [x for x in touching if len(x[0]) == 2]
+        return [(x[0][0], x[0][1]) for x in gears]
+
+    def getGearValues(self) -> list[tuple[int, int]]:
+        return [(a.getNumber(), b.getNumber()) for a, b in self.getGears()]
+
+    def getGearRatios(self) -> list[int]:
+        return [a * b for a, b in self.getGearValues()]
 
 
 if __name__ == "__main__":
@@ -130,3 +174,43 @@ if __name__ == "__main__":
     nums = [x.getNumber() for x in map2.getNumbersAdjacentToSymbol()]
     res = sum(nums)
     assert res == 4361
+
+    # 467, 35, 617, 755, 598
+    withNeighbors = [x for x in map2.getNumbersAdjacentToSymbolWithStarNeighbors() if len(x[1]) > 0]
+    assert len(withNeighbors) == 5
+    assert withNeighbors[0][0].getNumber() == 467
+    assert withNeighbors[1][0].getNumber() == 35
+    assert withNeighbors[2][0].getNumber() == 617
+    assert withNeighbors[3][0].getNumber() == 755
+    assert withNeighbors[4][0].getNumber() == 598
+
+    touching = map2.getStarTouching()
+    assert len(touching) == 3
+    # 467, 35
+    touching1 = touching[0][0]
+    assert len(touching1) == 2
+    # 617
+    touching3 = touching[1][0]
+    assert len(touching3) == 1
+    # 755, 598
+    touching4 = touching[2][0]
+    assert len(touching4) == 2
+
+    gears = map2.getGears()
+    assert len(gears) == 2
+    assert gears[0][0].getNumber() == 467
+    assert gears[0][1].getNumber() == 35
+    assert gears[1][0].getNumber() == 755
+    assert gears[1][1].getNumber() == 598
+
+    gearValues = map2.getGearValues()
+    assert len(gearValues) == 2
+    assert gearValues[0] == (467, 35)
+    assert gearValues[1] == (755, 598)
+
+    gearRatios = map2.getGearRatios()
+    assert len(gearRatios) == 2
+    assert gearRatios[0] == 467 * 35
+    assert gearRatios[1] == 755 * 598
+
+    assert sum(gearRatios) == 467835

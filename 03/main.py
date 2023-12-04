@@ -9,6 +9,11 @@ with open(inputFile) as f:
     m = Map(lines)
 
     nums = [w.getNumber() for w in m.getNumbersAdjacentToSymbol()]
-    res = sum(nums)
+    res1 = sum(nums)
 
-    print(f"Part 1: {res}")
+    print(f"Part 1: {res1}")
+
+    gearRatios = m.getGearRatios()
+    res2 = sum(gearRatios)
+
+    print(f"Part 2: {res2}")
