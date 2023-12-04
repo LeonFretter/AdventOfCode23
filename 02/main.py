@@ -1,4 +1,4 @@
-from solution import possibleIndicesSum, readGame
+from solution import possibleIndicesSum, readGame, findPowerSum
 import os
 
 dirname = os.path.dirname(__file__)
@@ -12,4 +12,7 @@ with open(inputFile, 'r') as f:
     games = [readGame(line) for line in lines]
 
     s = possibleIndicesSum(games)
-    print(s)
+    print(f"Part 1: {s}")
+
+    s2 = findPowerSum(games)
+    print(f"Part 2: {s2}")

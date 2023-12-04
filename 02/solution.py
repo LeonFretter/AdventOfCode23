@@ -37,7 +37,7 @@ def readGame(line: str) -> Game:
     idx = int(header.split(" ")[1])
     colorTxt = colorTxt.replace(";", ",")
     colors = colorTxt.split(",")
-    colorPairs: tuple(Color, int) = []
+    colorPairs: list[tuple[Color, int]] = []
     for c in colors:
         num, color = c.strip().split(" ")
         colorPairs.append((getColor(color), int(num)))
@@ -64,6 +64,14 @@ def possibleIndicesSum(games: list[Game]) -> int:
     return sum(possibleIndices(games))
 
 
+def findPower(game: Game) -> int:
+    return max(game.reds) * max(game.greens) * max(game.blues)
+
+
+def findPowerSum(games: list[Game]) -> int:
+    return sum([findPower(g) for g in games])
+
+
 if __name__ == "__main__":
     line1 = "Game 1: 3 blue, 7 green, 10 red; 4 green, 4 red; 1 green, 7 blue, 5 red; 8 blue, 10 red; 7 blue, 19 red, 1 green"
     res1 = readGame(line1)
@@ -73,6 +81,10 @@ if __name__ == "__main__":
     assert res1.blues == [3, 7, 8, 7]
 
     game1 = Game([13], [1], [2], 1)
-    assert isPossible(game1) == False
+    assert isPossible(game1) is False
     game2 = Game([10], [1], [2], 2)
-    assert isPossible(game2) == True
+    assert isPossible(game2) is True
+
+    assert findPower(game1) == 26
+    assert findPower(game2) == 20
+    assert findPower(res1) == 1064
