@@ -7,6 +7,9 @@ class Map:
     src_range_start: int
     range_length: int
 
+    def inRange(self, source: int) -> bool:
+        return source >= self.src_range_start and source < self.src_range_start + self.range_length
+
     def getDestination(self, source: int) -> int:
         if source < self.src_range_start:
             raise ValueError("Source is too small")
@@ -15,36 +18,42 @@ class Map:
         return self.dst_range_start + (source - self.src_range_start)
 
 
-@dataclass
 class MultiMap:
-    maps: list[Map]
+    def __init__(self, maps: list[Map]) -> None:
+        maps.sort(key=lambda x: x.src_range_start)
+        self.maps = maps
 
-    def getDestinations(self, source: int) -> list[int]:
-        res: list[int] = []
-        for m in self.maps:
-            try:
-                res.append(m.getDestination(source))
-            except ValueError:
-                pass
-        return res
+    def getDestination(self, source: int) -> int | None:
+        for map in self.maps:
+            if map.inRange(source):
+                return map.getDestination(source)
+        return None
 
-
-def findBetween(s: str, start: str, end: str) -> str:
-    return s.split(start)[1].split(end)[0]
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, MultiMap):
+            return False
+        return self.maps == other.maps
 
 
 @dataclass
 class Tree:
     map_layers: list[MultiMap]
 
-    def getLeaves(self, root: int) -> list[int]:
-        current_layer: list[int] = [root]
-        next_layer: list[int] = []
+    def getPath(self, root: int) -> list[int]:
+        path = [root]
+        current_node = root
+        next_node = None
         for layer in self.map_layers:
-            for node in current_layer:
-                next_layer.extend(layer.getDestinations(node))
-            current_layer = next_layer
-        return next_layer
+            next_node = layer.getDestination(current_node)
+            if next_node is None:
+                next_node = current_node
+            path.append(next_node)
+            current_node = next_node
+        return path
+
+
+def findBetween(s: str, start: str, end: str) -> str:
+    return s.split(start)[1].split(end)[0]
 
 
 class MapReader:
@@ -93,10 +102,11 @@ class MapReader:
         return [int(s) for s in seed_txt.strip().split(" ")]
 
 
-def getLocations(seeds: list[int], tree: Tree) -> list[tuple[int, list[int]]]:
-    locations: list[tuple[int, list[int]]] = []
+def getLocations(seeds: list[int], tree: Tree) -> list[int]:
+    locations: list[int] = []
     for seed in seeds:
-        locations.append((seed, tree.getLeaves(seed)))
+        path = tree.getPath(seed)
+        locations.append(path[-1])
     return locations
 
 
@@ -108,6 +118,27 @@ if __name__ == "__main__":
     exampleMap2 = Map(0, 15, 37)
     assert exampleMap2.getDestination(15) == 0
     assert exampleMap2.getDestination(16) == 1
+
+    exampleTree = Tree(
+        [
+            MultiMap(
+                [
+                    Map(0, 2, 2),
+                ],
+            ),
+            MultiMap(
+                [
+                    Map(10, 0, 2)
+                ]
+            )
+        ]
+    )
+
+    examplePath1 = exampleTree.getPath(2)
+    assert examplePath1 == [2, 0, 10]
+
+    examplePath2 = exampleTree.getPath(3)
+    assert examplePath2 == [3, 1, 11]
 
     txt = """
 seeds: 79 14 55 13
@@ -197,9 +228,8 @@ humidity-to-location map:
             )
         ]
     )
-    l1 = tree.getLeaves(0)
-    assert tree.getLeaves(0) == [0]
-    assert tree.getLeaves(69) == [98]
-    assert tree.getLeaves(97) == [99]
-    assert tree.getLeaves(98) == [50]
-    assert tree.getLeaves(99) == [51]
+    examplePath = tree.getPath(0)
+    assert examplePath == [0, 0, 39, 28, 21, 21, 22, 22]
+
+    expectedLocations = [82, 43, 86, 35]
+    assert getLocations(seeds, tree) == expectedLocations
