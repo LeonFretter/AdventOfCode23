@@ -56,6 +56,10 @@ def findBetween(s: str, start: str, end: str) -> str:
     return s.split(start)[1].split(end)[0]
 
 
+def listChunks[T](initial: list[T], sz: int) -> list[list[T]]:
+    return [initial[i: min(i + sz, len(initial))] for i in range(0, len(initial), sz)]
+
+
 class MapReader:
     def __init__(self, txt: str) -> None:
         seeds_txt = findBetween(txt, "seeds:", "\n")
@@ -67,7 +71,8 @@ class MapReader:
         temperature_to_humidity_txt = findBetween(txt, "temperature-to-humidity map:", "humidity-to-location map:")
         humidity_to_location_txt = txt.split("humidity-to-location map:")[1]
 
-        self.seeds = self.parseSeeds(seeds_txt)
+        self.seeds = MapReader.parseSeeds(seeds_txt)
+        self.seedRanges = MapReader.parseSeedRanges(seeds_txt)
         seed_to_soil = self.parseMap(seed_to_soil_txt)
         soil_to_fertilizer = self.parseMap(soil_to_fertilizer_txt)
         fertilizer_to_water = self.parseMap(fertilizer_to_water_txt)
@@ -98,8 +103,31 @@ class MapReader:
             maps.append(Map(dst_range_start, src_range_start, range_length))
         return MultiMap(maps)
 
-    def parseSeeds(self, seed_txt: str) -> list[int]:
+    @staticmethod
+    def parseSeeds(seed_txt: str) -> list[int]:
         return [int(s) for s in seed_txt.strip().split(" ")]
+
+    @staticmethod
+    def parseSeedRanges(seed_text: str) -> list[tuple[int, int]]:
+        nums = seed_text.strip().split(" ")
+        ranges = listChunks(nums, 2)
+        ranges.sort(key=lambda x: int(x[0]))
+        res_ranges: list[tuple[int, int]] = []
+        for r in ranges:
+            res_ranges.append((int(r[0]), int(r[1])))
+        return res_ranges
+
+    @staticmethod
+    def seedsFromRange(rng: tuple[int, int]) -> list[int]:
+        ra, rb = rng
+        return list(range(ra, ra + rb))
+
+    @staticmethod
+    def seedsFromRanges(rngs: list[tuple[int, int]]) -> list[int]:
+        seeds: list[int] = []
+        for rng in rngs:
+            seeds.extend(MapReader.seedsFromRange(rng))
+        return seeds
 
 
 def getLocations(seeds: list[int], tree: Tree) -> list[int]:
@@ -233,3 +261,8 @@ humidity-to-location map:
 
     expectedLocations = [82, 43, 86, 35]
     assert getLocations(seeds, tree) == expectedLocations
+
+    exampleRangeTxt = "0 4 4 5 9 2"
+    exampleRanges = MapReader.parseSeedRanges(exampleRangeTxt)
+    exampleRangeSeeds = MapReader.seedsFromRanges(exampleRanges)
+    assert exampleRangeSeeds == [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
