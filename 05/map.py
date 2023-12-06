@@ -10,12 +10,22 @@ class Map:
     def inRange(self, source: int) -> bool:
         return source >= self.src_range_start and source < self.src_range_start + self.range_length
 
+    def dstInRange(self, dst: int) -> bool:
+        return dst >= self.dst_range_start and dst < self.dst_range_start + self.range_length
+
     def getDestination(self, source: int) -> int:
         if source < self.src_range_start:
             raise ValueError("Source is too small")
         if source >= self.src_range_start + self.range_length:
             raise ValueError("Source is too large")
         return self.dst_range_start + (source - self.src_range_start)
+
+    def getSource(self, dst: int) -> int:
+        if dst < self.dst_range_start:
+            raise ValueError("Destination is too small")
+        if dst >= self.dst_range_start + self.range_length:
+            raise ValueError("Destination is too large")
+        return self.src_range_start + (dst - self.dst_range_start)
 
 
 class MultiMap:
@@ -28,6 +38,11 @@ class MultiMap:
             if map.inRange(source):
                 return map.getDestination(source)
         return None
+
+    def getSource(self, dst: int) -> int | None:
+        for map in self.maps:
+            if map.dstInRange(dst):
+                return map.getSource(dst)
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, MultiMap):
@@ -51,6 +66,18 @@ class Tree:
             current_node = next_node
         return path
 
+    def getReversePath(self, leaf: int) -> list[int]:
+        path = [leaf]
+        current_node = leaf
+        next_node = None
+        for layer in reversed(self.map_layers):
+            next_node = layer.getSource(current_node)
+            if next_node is None:
+                next_node = current_node
+            path.append(next_node)
+            current_node = next_node
+        return path
+
 
 def findBetween(s: str, start: str, end: str) -> str:
     return s.split(start)[1].split(end)[0]
@@ -68,6 +95,7 @@ class MapReader:
         humidity_to_location_txt = txt.split("humidity-to-location map:")[1]
 
         self.seeds = self.parseSeeds(seeds_txt)
+        self.seed_ranges = self.parseSeedRanges(seeds_txt)
         seed_to_soil = self.parseMap(seed_to_soil_txt)
         soil_to_fertilizer = self.parseMap(soil_to_fertilizer_txt)
         fertilizer_to_water = self.parseMap(fertilizer_to_water_txt)
@@ -101,6 +129,13 @@ class MapReader:
     def parseSeeds(self, seed_txt: str) -> list[int]:
         return [int(s) for s in seed_txt.strip().split(" ")]
 
+    def parseSeedRanges(self, seed_txt: str) -> list[tuple[int, int]]:
+        seed_ranges = []
+        parts = seed_txt.strip().split(" ")
+        for i in range(0, len(parts), 2):
+            seed_ranges.append((int(parts[i]), int(parts[i + 1])))
+        return seed_ranges
+
 
 def getLocations(seeds: list[int], tree: Tree) -> list[int]:
     locations: list[int] = []
@@ -110,14 +145,27 @@ def getLocations(seeds: list[int], tree: Tree) -> list[int]:
     return locations
 
 
+def containsSeed(range: tuple[int, int], seed: int) -> bool:
+    return seed >= range[0] and seed < range[0] + range[1]
+
+
+def getSeedFromLocation(location: int, tree: Tree) -> int:
+    path = tree.getReversePath(location)
+    return path[-1]
+
+
 if __name__ == "__main__":
     exampleMap = Map(50, 98, 2)
     assert exampleMap.getDestination(98) == 50
     assert exampleMap.getDestination(99) == 51
+    assert exampleMap.getSource(50) == 98
+    assert exampleMap.getSource(51) == 99
 
     exampleMap2 = Map(0, 15, 37)
     assert exampleMap2.getDestination(15) == 0
     assert exampleMap2.getDestination(16) == 1
+    assert exampleMap2.getSource(0) == 15
+    assert exampleMap2.getSource(1) == 16
 
     exampleTree = Tree(
         [
@@ -136,9 +184,17 @@ if __name__ == "__main__":
 
     examplePath1 = exampleTree.getPath(2)
     assert examplePath1 == [2, 0, 10]
+    exampleReversePath1 = exampleTree.getReversePath(10)
+    assert exampleReversePath1 == [10, 0, 2]
+    exampleSeed1 = getSeedFromLocation(10, exampleTree)
+    assert exampleSeed1 == 2
 
     examplePath2 = exampleTree.getPath(3)
     assert examplePath2 == [3, 1, 11]
+    exampleReversePath2 = exampleTree.getReversePath(11)
+    assert exampleReversePath2 == [11, 1, 3]
+    exampleSeed2 = getSeedFromLocation(11, exampleTree)
+    assert exampleSeed2 == 3
 
     txt = """
 seeds: 79 14 55 13
@@ -230,6 +286,15 @@ humidity-to-location map:
     )
     examplePath = tree.getPath(0)
     assert examplePath == [0, 0, 39, 28, 21, 21, 22, 22]
+    exampleReversePath = tree.getReversePath(22)
+    assert exampleReversePath == [22, 22, 21, 21, 28, 39, 0, 0]
+    assert getSeedFromLocation(22, tree) == 0
 
     expectedLocations = [82, 43, 86, 35]
     assert getLocations(seeds, tree) == expectedLocations
+
+    exampleSeedRange = (15, 10)
+    assert containsSeed(exampleSeedRange, 15)
+    assert containsSeed(exampleSeedRange, 24)
+    assert not containsSeed(exampleSeedRange, 14)
+    assert not containsSeed(exampleSeedRange, 25)
