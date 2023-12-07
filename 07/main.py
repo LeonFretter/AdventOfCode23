@@ -11,3 +11,8 @@ with open(filename) as f:
     game = Game(players)
 
     print(f"Part 1: {game.getScore()}")
+
+    players_with_joker = [parsePlayer(line, True) for line in lines]
+    game_with_joker = Game(players_with_joker)
+
+    print(f"Part 2: {game_with_joker.getScore()}")
