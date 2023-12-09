@@ -1,2 +1,8 @@
 **/__pycache__
 **/target
+**/CMakeFiles
+**/CMakeCache.txt
+**/cmake_install.cmake
+**/Makefile
+
+08/cpp/Day8
