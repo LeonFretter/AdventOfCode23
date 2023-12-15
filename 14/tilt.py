@@ -58,6 +58,11 @@ class Board:
                 if obj is not None:
                     self.columns[x].append(obj)
 
+    def copy(self) -> "Board":
+        stringified = str(self)
+        lines = stringified.split("\n")
+        return Board(lines)
+
     def getFurthestFreePosNorth(self, obj: Object) -> Vec2:
         row_idx = self.columns[obj.position.x].index(obj)
         if row_idx == 0:
@@ -66,7 +71,7 @@ class Board:
             obj_north = self.columns[obj.position.x][row_idx - 1]
             return Vec2(obj.position.x, obj_north.position.y + 1)
 
-    def getFurthestFreePosSouth(self, obj: Object) -> Vec2 | None:
+    def getFurthestFreePosSouth(self, obj: Object) -> Vec2:
         row_idx = self.columns[obj.position.x].index(obj)
         if row_idx == len(self.columns[obj.position.x]) - 1:
             return Vec2(obj.position.x, self.h - 1)
@@ -74,7 +79,7 @@ class Board:
             obj_south = self.columns[obj.position.x][row_idx + 1]
             return Vec2(obj.position.x, obj_south.position.y - 1)
 
-    def getFurthestFreePosWest(self, obj: Object) -> Vec2 | None:
+    def getFurthestFreePosWest(self, obj: Object) -> Vec2:
         col_idx = self.rows[obj.position.y].index(obj)
         if col_idx == 0:
             return Vec2(0, obj.position.y)
@@ -82,7 +87,7 @@ class Board:
             obj_west = self.rows[obj.position.y][col_idx - 1]
             return Vec2(obj_west.position.x + 1, obj.position.y)
 
-    def getFurthestFreePosEast(self, obj: Object) -> Vec2 | None:
+    def getFurthestFreePosEast(self, obj: Object) -> Vec2:
         col_idx = self.rows[obj.position.y].index(obj)
         if col_idx == len(self.rows[obj.position.y]) - 1:
             return Vec2(self.w - 1, obj.position.y)
@@ -191,6 +196,9 @@ class Board:
             new_line = ""
         return "\n".join(lines)
 
+    def __eq__(self, other: "Board") -> bool:
+        return str(self) == str(other)
+
 
 if __name__ == "__main__":
     txt = str("""\
@@ -229,3 +237,10 @@ O.#..O.#.#
     print("\n\n")
     print(result_txt)
     assert result_txt == expected_txt
+
+    board1 = board.copy()
+    board2 = board.copy()
+    assert board1 == board2
+    board1.rollSouth()
+    board1.rollNorth()
+    assert board1 == board2

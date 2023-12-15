@@ -11,13 +11,27 @@ with open(filename) as f:
     board.rollNorth()
     weight = board.getWeight()
 
-    print("Part 1:", weight)
+    print("Part 1: ", weight)
 
-    for i in range(1000000000):
+    hist: list[Board] = []
+
+    i = 0
+    while i < 1000000000:
+        if board in hist:
+            idx = hist.index(board)
+            # idx is 0 after this op
+            hist = hist[idx:]
+            break
+        hist.append(board.copy())
         board.spinCycle()
+        print("i: ", i)
         if i >= 1000000000 - 5:
             weight = board.getWeight()
             print("weight:", weight)
-        # if i % 100 == 0:
-        print(i)
-    print("Part 2:", weight)
+        i += 1
+
+    idx = (1000000000 - i) % len(hist)
+    board = hist[idx]
+    weight = board.getWeight()
+
+    print("Part 2: ", weight)
