@@ -34,6 +34,7 @@ class Board:
         self.w = len(lines[0])
         self.h = len(lines)
         self.rows: list[list[Object]] = []
+        self.columns: list[list[Object]] = []
         self.objects: list[Object] = []
         self.movable: list[Object] = []
 
@@ -50,40 +51,28 @@ class Board:
                     self.rows[y].append(obj)
                 else:
                     continue
+        for x in range(self.w):
+            self.columns.append([])
+            for y in range(self.h):
+                obj = next((o for o in self.rows[y] if o.position.x == x), None)
+                if obj is not None:
+                    self.columns[x].append(obj)
 
-    def getFurthestFreePosNorth(self, obj: Object) -> Vec2 | None:
-        pos = obj.position
-        free_pos = None
-        for y in range(pos.y - 1, -1, -1):
-            found_solid = False
-            row = self.rows[y]
-            for o in row:
-                if o.position.x > pos.x:
-                    break
-                if o.position.x == pos.x:
-                    found_solid = True
-                    break
-            if found_solid:
-                break
-            else:
-                free_pos = Vec2(pos.x, y)
-        return free_pos
+    def getFurthestFreePosNorth(self, obj: Object) -> Vec2:
+        row_idx = self.columns[obj.position.x].index(obj)
+        if row_idx == 0:
+            return Vec2(obj.position.x, 0)
+        else:
+            obj_north = self.columns[obj.position.x][row_idx - 1]
+            return Vec2(obj.position.x, obj_north.position.y + 1)
 
     def getFurthestFreePosSouth(self, obj: Object) -> Vec2 | None:
-        pos = obj.position
-        free_pos = None
-        for y in range(pos.y + 1, len(self.rows)):
-            found_solid = False
-            for o in self.rows[y]:
-                if o.position.x > pos.x:
-                    break
-                if o.position.x == pos.x:
-                    found_solid = True
-            if found_solid:
-                break
-            else:
-                free_pos = Vec2(pos.x, y)
-        return free_pos
+        row_idx = self.columns[obj.position.x].index(obj)
+        if row_idx == len(self.columns[obj.position.x]) - 1:
+            return Vec2(obj.position.x, self.h - 1)
+        else:
+            obj_south = self.columns[obj.position.x][row_idx + 1]
+            return Vec2(obj.position.x, obj_south.position.y - 1)
 
     def getFurthestFreePosWest(self, obj: Object) -> Vec2 | None:
         col_idx = self.rows[obj.position.y].index(obj)
@@ -103,9 +92,18 @@ class Board:
 
     def move(self, obj: Object, new_pos: Vec2) -> None:
         self.rows[obj.position.y].remove(obj)
+        self.columns[obj.position.x].remove(obj)
         obj.position = new_pos
-        self.rows[new_pos.y].append(obj)
-        self.rows[new_pos.y].sort(key=lambda o: o.position.x)
+        new_idx_in_row = next(
+            (i for i, o in enumerate(self.rows[new_pos.y]) if o.position.x > new_pos.x),
+            len(self.rows[new_pos.y]),
+        )
+        new_idx_in_col = next(
+            (i for i, o in enumerate(self.columns[new_pos.x]) if o.position.y > new_pos.y),
+            len(self.columns[new_pos.x]),
+        )
+        self.rows[new_pos.y].insert(new_idx_in_row, obj)
+        self.columns[new_pos.x].insert(new_idx_in_col, obj)
 
     def rollNorth(self) -> None:
         while True:
