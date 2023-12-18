@@ -15,10 +15,16 @@ class Vec2:
     def __mul__(self, other: int) -> "Vec2":
         return Vec2(self.x * other, self.y * other)
 
+    def __str__(self) -> str:
+        return f"({self.x}, {self.y})"
+
 
 @dataclass
 class Node:
     pos: Vec2
+
+    def __str__(self) -> str:
+        return str(self.pos)
 
 
 @dataclass
@@ -31,6 +37,9 @@ class Instruction:
         for i in range(1, self.steps + 1):
             nodes.append(Node(current.pos + self.direction * i))
         return nodes
+
+    def __str__(self) -> str:
+        return f"{self.direction} * {self.steps}"
 
 
 def readInstruction(line: str) -> Instruction:
