@@ -1,5 +1,5 @@
 from enum import Enum
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Optional
 
 
@@ -153,6 +153,63 @@ def readProblemSet(input_txt: str) -> ProblemSet:
     return ProblemSet(workflows, elements)
 
 
+@dataclass
+class WorkflowNode:
+    workflow: Workflow | str
+    children: list["WorkflowTree"] = field(default_factory=list)
+    parent: Optional["WorkflowNode"] = None
+
+    def getLeaves(self) -> "list[WorkflowNode]":
+        leaves: list[WorkflowNode] = []
+        if isinstance(self.workflow, str):
+            return [self]
+        for child in self.children:
+            leaves.extend(child.getLeaves())
+        return leaves
+
+    def getPaths(self) -> "list[list[WorkflowNode]]":
+        paths: list[list[WorkflowNode]] = []
+        leaves = self.getLeaves()
+        for leaf in leaves:
+            path: list[WorkflowNode] = []
+            node = leaf
+            while node is not None:
+                path.append(node)
+                node = node.parent
+            paths.append(list(reversed(path)))
+        return paths
+
+
+type WorkflowTree = WorkflowNode
+
+
+def buildWorkflowNode(node: WorkflowTree, workflows: list[Workflow]) -> None:
+    if isinstance(node.workflow, str):
+        return
+    workflow = node.workflow
+    children: list[WorkflowTree] = []
+    for rule in workflow.rules:
+        target = rule.target
+        if target == "A" or target == "R":
+            child_node = WorkflowNode(target)
+            child_node.parent = node
+            children.append(child_node)
+        else:
+            child = next(w for w in workflows if w.name == target)
+            child_node = WorkflowNode(child)
+            child_node.parent = node
+            buildWorkflowNode(child_node, workflows)
+            children.append(child_node)
+        node.children = children
+
+
+def buildWorkflowTree(workflows: list[Workflow]) -> WorkflowNode:
+    root = next(w for w in workflows if w.name == "in")
+    node = WorkflowNode(root)
+    buildWorkflowNode(node, workflows)
+    return node
+
+
 if __name__ == "__main__":
     txt = """\
 px{a<2006:qkq,m>2090:A,rfg}
@@ -182,3 +239,5 @@ hdj{m>838:A,pv}
 
     res = sum(int(e) for e in accepted)
     assert res == 19114
+
+    buildWorkflowTree(problem_set.workflows)
