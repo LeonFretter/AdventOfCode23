@@ -6,6 +6,7 @@ from typing import override
 class NodeBlueprint:
     name: str
     children: list[str]
+    node_type: str
 
 
 @dataclass
@@ -20,6 +21,10 @@ class Node:
     def name(self) -> str:
         return self.blueprint.name
 
+    @property
+    def node_type(self) -> str:
+        return self.blueprint.node_type
+
     def updateConfig(self) -> None:
         pass
 
@@ -30,8 +35,46 @@ class Node:
             self.low_pulse_count += 1
         return []
 
+    def conditionStr(self) -> str:
+        return "_"
+
+    def pathsTo(self) -> "list[list[Node]]":
+        paths: list[list[Node]] = [[self]]
+        while not all([path[-1].parents == [] for path in paths]):
+            new_paths = []
+            for p in paths:
+                parents = p[-1].parents
+                if p[-1].parents == []:
+                    new_paths.append(p)
+                for par in parents:
+                    if par in p:
+                        dummy = LoopDummyNode(NodeBlueprint("dummy", [], "dummy"))
+                        dummy.original = par
+                        new_paths.append(p + [dummy])
+                    else:
+                        new_paths.append(p + [par])
+            paths = new_paths
+        return [list(reversed(path)) for path in paths]
+
     def __hash__(self) -> int:
         return hash(self.name)
+
+    def __str__(self) -> str:
+        res = self.name
+        if self.node_type in ["%", "&"]:
+            res += self.node_type
+        if self.node_type == "&":
+            res += str(len(self.parents))
+        return res
+
+
+@dataclass
+class LoopDummyNode(Node):
+    original: Node | None = None
+
+    @override
+    def conditionStr(self) -> str:
+        return "(loop:" + self.original.conditionStr() + ")"
 
 
 @dataclass
@@ -50,6 +93,12 @@ class FlipFlop(Node):
 
     def __bool__(self) -> bool:
         return self.state
+
+    @override
+    def conditionStr(self) -> str:
+        names = [p.name for p in self.parents]
+        names = [name + "=0" for name in names]
+        return "(" + " | ".join(names) + " -> !" + self.name + ".state)"
 
     def __hash__(self) -> int:
         return super().__hash__()
@@ -74,6 +123,10 @@ class Conjunction(Node):
             res.append((self, child, out_pulse))
         return res
 
+    @override
+    def conditionStr(self) -> str:
+        return "(" + " & ".join([p.name for p in self.parents]) + ")"
+
     def __hash__(self) -> int:
         return super().__hash__()
 
@@ -86,6 +139,10 @@ class Broadcaster(Node):
         for child in self.children:
             res.append((self, child, pulse))
         return res
+
+    @override
+    def conditionStr(self) -> str:
+        return "(*)"
 
     def __hash__(self) -> int:
         return super().__hash__()
@@ -101,7 +158,7 @@ def readNode(line: str) -> Node:
         node_name = node_txt[1:]
 
     children = children_txt.split(", ")
-    blueprint = NodeBlueprint(node_name, children)
+    blueprint = NodeBlueprint(node_name, children, node_type)
 
     node = {
         "%": FlipFlop(blueprint),
@@ -121,14 +178,8 @@ def readNodes(lines: list[str]) -> dict[str, Node]:
 
 
 def connectNodes(lines: list[str]) -> dict[str, Node]:
-    old_nodes = readNodes(lines)
-    nodes = old_nodes.copy()
-
-    for node in old_nodes.values():
-        for child_name in node.blueprint.children:
-            if child_name not in nodes:
-                child = Node(NodeBlueprint(child_name, []), [], [])
-                nodes[child_name] = child
+    nodes = readNodes(lines)
+    nodes["rx"] = Node(NodeBlueprint("rx", [], "rx"), [], [])
 
     for node in nodes.values():
         for child_name in node.blueprint.children:
@@ -145,13 +196,17 @@ def connectNodes(lines: list[str]) -> dict[str, Node]:
 @dataclass
 class CommandCenter:
     nodes: dict[str, Node]
-    button = Node(NodeBlueprint("button", []), [], [])
+    button = Node(NodeBlueprint("button", [], "btn"), [], [])
 
     @property
     def broadcaster(self) -> Broadcaster:
         res = self.nodes["broadcaster"]
         assert isinstance(res, Broadcaster)
         return res
+
+    @property
+    def rx(self) -> Node:
+        return self.nodes["rx"]
 
     def pressButton(self) -> None:
         stack: list[tuple[Node, Node, bool]] = [(self.button, self.broadcaster, False)]
@@ -163,6 +218,15 @@ class CommandCenter:
         for _ in range(times):
             self.pressButton()
 
+    def pressButtonUntil(self) -> int:
+        i = 0
+        while not self.rx.low_pulse_count:
+            self.pressButton()
+            i += 1
+            if i % 1000 == 0:
+                print(i)
+        return i
+
     def countPulses(self) -> int:
         low_pulse_count = 0
         high_pulse_count = 0
@@ -170,6 +234,22 @@ class CommandCenter:
             low_pulse_count += node.low_pulse_count
             high_pulse_count += node.high_pulse_count
         return low_pulse_count * high_pulse_count
+
+    def conditionStrPath(self, path: list[Node]) -> str:
+        return " -> ".join([node.conditionStr() for node in path])
+
+    def conditionStr(self, target: str) -> list[str]:
+        node = self.nodes[target]
+        paths = node.pathsTo()
+        return [self.conditionStrPath(path) for path in paths]
+
+    def pathStr(self, target: str) -> list[str]:
+        node = self.nodes[target]
+        paths = node.pathsTo()
+        res = []
+        for p in paths:
+            res.append("[" + ", ".join([str(node) for node in p]) + "]")
+        return res
 
 
 if __name__ == "__main__":
@@ -187,3 +267,8 @@ broadcaster -> a, b, c
     example_cc.pressButtonMulti(1000)
     num_pulses = example_cc.countPulses()
     assert num_pulses == 32000000
+
+    cc2 = CommandCenter(connectNodes(example_lines))
+    condition_str = cc2.conditionStr("a")
+
+    print("\n".join(condition_str))
