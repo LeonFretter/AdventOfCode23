@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 @dataclass
@@ -212,6 +212,65 @@ class BrickMap:
         return res
 
 
+@dataclass
+class Node:
+    brick: Brick
+    children: "list[Node]" = field(default_factory=list)
+    parents: "list[Node]" = field(default_factory=list)
+
+    def __eq__(self, other: "Node") -> bool:
+        return self.brick == other.brick
+
+    def __hash__(self) -> int:
+        return hash(self.brick)
+
+    def getFalling(self, currently_falling: "set[Node]", force=False) -> None:
+        if self in currently_falling:
+            return
+        else:
+            # if there's any support that's not falling, then this brick won't fall
+            if not force and any([p for p in self.parents if p not in currently_falling]):
+                return
+            else:
+                currently_falling.add(self)
+                for child in self.children:
+                    child.getFalling(currently_falling)
+
+
+type Tree = Node
+
+
+def createTrees(m: BrickMap) -> list[Tree]:
+    bricks = m.bricks
+
+    nodes = {
+        brick: Node(brick)
+        for brick in bricks
+    }
+
+    trees = [n for n in nodes.values()]
+
+    # create connections
+    for node in nodes.values():
+        brick = node.brick
+        brick_supports = m.supportedBy(brick)
+        for brick_support in brick_supports:
+            child_node = nodes[brick_support]
+            node.children.append(child_node)
+            child_node.parents.append(node)
+
+    return trees
+
+
+def treeFallCounts(trees: list[Tree]) -> list[int]:
+    falling = [set() for _ in trees]
+    for i, tree in enumerate(trees):
+        tree.getFalling(falling[i], force=True)
+        if tree in falling[i]:
+            falling[i].remove(tree)
+    return [len(f) for f in falling]
+
+
 if __name__ == "__main__":
     txt: str = """\
 1,0,1~1,2,1
@@ -239,3 +298,9 @@ if __name__ == "__main__":
     assert example_map.canDisintegrate(example_brick2)
     assert not example_map.canDisintegrate(example_brick)
     assert example_map.countDisintegratable() == 1
+
+    trees = createTrees(brick_map)
+    fall_counts = treeFallCounts(trees)
+    s = sum(fall_counts)
+    print(s)
+    assert s == 7
